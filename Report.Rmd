@@ -24,6 +24,7 @@ library(knitr)
 library(lme4)
 library(ggplot2)
 library(kableExtra)
+library(broom.mixed)
 ```
 
 ```{r data-manipulation, message=FALSE}
@@ -165,20 +166,40 @@ By incorporating these player-level variables and a team-level random intercept,
 The full model in mathematical notation is displayed below:
 
 \[
-PPP_{next_{ij}} = \beta_0 + \beta_1 \times PPP_{ij} + \beta_2 \times GP_{ij} + \beta_3 \times EFG\_PCT_{ij} + \beta_4 \times FTA\_FREQ_{ij} + \beta_5 \times TOV\_FREQ_{ij} + \beta_6 \times FREQ_{ij} + u_{0j} + \varepsilon_{ij}
+PPP_{next_{ij}} = \beta_0 + u_{0j} + \beta_1 \times PPP_{ij} + \beta_2 \times GP_{ij} + \beta_3 \times EFG\_PCT_{ij} + \beta_4 \times FTA\_FREQ_{ij} + \beta_5 \times TOV\_FREQ_{ij} + \beta_6 \times FREQ_{ij} + \varepsilon_{ij}
 \]
 
+$$\epsilon_{ij} \sim N(0, \sigma^2), u_{0j} \sim N(0, \sigma_u^2)$$
+
+Where $PPP_{next_{ij}}$ is the points per possession for the next season for player $i$ on team $j$, $\beta_1 - \beta_6$ are the fixed effect coefficients for the respective level one predictors, $GP_{ij}, EFG\_PCT_{ij}, FTA\_FREQ_{ij}, TOV\_FREQ_{ij}, FREQ_{ij}$ are the player-level predictor variables for player $i$ on team $j$, $u_{0j}$ is the random intercept for team $j$ (captures the team-level component) and $\varepsilon_{ij}$ is the residual error term for player $i$ on team $j$. Both error terms are assumed to follow a normal distribution centered at zero.
 
 # Results
 
-```{r model}
+The random intercepts model was implemented using the `lmer` function from the `lme4` package, and 
+
+```{r model-creation}
 # Fit the random intercept model
-model <- lmer(PPP_next ~ PPP + GP + EFG_PCT + FTA_FREQ + TOV_FREQ + FREQ + (1 | TEAM_ABB), data = nba_data_clean |> filter(PLAY_TYPE == "Isolation"))
+model_iso <- lmer(PPP_next ~ PPP + GP + EFG_PCT + FTA_FREQ + TOV_FREQ + FREQ + (1 | TEAM_ABB), data = nba_data_clean |> filter(PLAY_TYPE == "Isolation"))
+model_pnr <- lmer(PPP_next ~ PPP + GP + EFG_PCT + FTA_FREQ + TOV_FREQ + FREQ + (1 | TEAM_ABB), data = nba_data_clean |> filter(PLAY_TYPE == "PnR Ball-Handler"))
+model_spotup <- lmer(PPP_next ~ PPP + GP + EFG_PCT + FTA_FREQ + TOV_FREQ + FREQ + (1 | TEAM_ABB), data = nba_data_clean |> filter(PLAY_TYPE == "Spotup"))
+```
 
+```{r model-outputs}
+tidy(model_iso) |>
+  kable(digits=3)
+
+tidy(model_pnr) |>
+  kable(digits=3)
+
+tidy(model_spotup) |>
+  kable(digits=3)
+```
+
+```{r random-intercepts}
 # View the summary of the model
-summary(model)
+summary(model_iso)
 
-random_effects <- ranef(model)$TEAM_ABB
+random_effects <- ranef(model_pnr)$TEAM_ABB
 
 # Convert to a data frame
 random_effects_df <- as.data.frame(random_effects)
@@ -196,7 +217,9 @@ random_effects_df <- random_effects_df[, c("TEAM_ABB", "Random_Intercept")]
 random_effects_df <- random_effects_df[order(random_effects_df$Random_Intercept, decreasing = TRUE), ]
 
 # View the table
-random_effects_df
+row.names(random_effects_df) <- NULL
+random_effects_df |>
+  kable(digits = 3)
 ```
 
 
