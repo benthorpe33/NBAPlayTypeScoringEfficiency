@@ -1,17 +1,19 @@
 ---
-title: "Vaulting into Victory: Optimizing for US Gymnastics Medal Count at the Paris 2024 Olympics"
+title: 'Developing Efficient Scorers in the NBA: Which teams do it the best?'
 author: "Benjamin Thorpe"
-date: "12-16-2023"
-geometry: "left=2cm,right=2cm,top=1.5cm,bottom=1.5cm"
-output: 
+date: "12-18-2023"
+output:
+  html_document:
+    df_print: paged
   pdf_document:
     fig_caption: yes
-warnings: false
+geometry: left=2cm,right=2cm,top=1.5cm,bottom=1.5cm
+warnings: no
 fontsize: 10
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 
@@ -23,8 +25,8 @@ library(stringr)
 library(knitr)
 library(lme4)
 library(ggplot2)
-library(kableExtra)
 library(broom.mixed)
+library(kableExtra)
 ```
 
 ```{r data-manipulation, message=FALSE}
@@ -52,18 +54,6 @@ nba_data_clean <- nba_data |>
   select(c(SEASON, PLAYER_NAME, PLAY_TYPE, TEAM_ABB, FREQ, PPP, PPP_PCTL,  GP, EFG_PCT, FTA_FREQ, TOV_FREQ, PPP_next, PPP_PCTL_next, PPP_change))
 
 ```
-
-Steps:
-1. Decide on case study idea - What teams best develop spotup shooters, effective cutters, and efficient PnR ball-handlers
-2. Write introduction on why this is important + background info about the topic
-3. Describe data source in detail (where I found it, website it's from, companies involved, what key variables mean, etc.)
-4. Do 3-5 visualizations explaining some things about the data - use past project as inspiration
-5. Write goals of the study + any expectations I have
-6. Come up with model structure I will use to accomplish the goals - multilevel linear model where level one is player's attributes (num possessions, age, PPP, frequency) and level two is the team they are on that year, response will be PPP_PCTL_next to account for league-wide efficiency changes and will examine team-level coefficients
-7. Write methodology section using the above
-8. Run the model and visualize results nicely in a table
-9. Write a couple results paragraphs
-10. Write conclusion, limitations and future study, and overall summary of the case
 
 # Introduction
 
@@ -131,7 +121,7 @@ reshaped_data <- reshaped_data %>% select(all_of(column_order))
 
 # Create a kable table
 kable_table <- kable(reshaped_data, caption = "<span style='font-size: 24px; color: black;'>Tyrese Haliburton</span>") %>%
-  kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T) %>%
   column_spec(1, bold = T)
 
 # Print the kable table
@@ -175,7 +165,7 @@ Where $PPP_{next_{ij}}$ is the points per possession for the next season for pla
 
 # Results
 
-The random intercepts model was implemented using the `lmer` function from the `lme4` package, and 
+The random intercepts model was implemented using the `lmer` function from the `lme4` package, and the outputs for each of the three models (one for each play type) are shown below:
 
 ```{r model-creation}
 # Fit the random intercept model
@@ -186,45 +176,195 @@ model_spotup <- lmer(PPP_next ~ PPP + GP + EFG_PCT + FTA_FREQ + TOV_FREQ + FREQ 
 
 ```{r model-outputs}
 tidy(model_iso) |>
-  kable(digits=3)
+  kable(digits = 3,
+        caption = "<span style='font-size: 24px; color: black;'>Isolations</span>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T) %>%
+  column_spec(1, bold = T)
 
 tidy(model_pnr) |>
-  kable(digits=3)
+  kable(digits = 3,
+        caption = "<span style='font-size: 24px; color: black;'>Pick and Rolls</span>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T) %>%
+  column_spec(1, bold = T)
 
 tidy(model_spotup) |>
-  kable(digits=3)
+  kable(digits = 3,
+        caption = "<span style='font-size: 24px; color: black;'>Spotups</span>") %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = T) %>%
+  column_spec(1, bold = T)
 ```
 
-```{r random-intercepts}
-# View the summary of the model
-summary(model_iso)
+In examining the factors that influence player performance in the three play types in my analysis, our linear mixed-effects models reveal several key insights. Most notably, the coefficient for PPP (Points Per Possession) has a relatively large test statistic (though notably not as high in isolations) as well as a positive coefficient in each of the three models, and this suggests a statistically significant positive effect on the response variable. This implies that an increase in PPP in a play type is associated with an improvement in the player's performance in that same play type the following season, which follows conventional wisdom that players with a relatively high PPP in a certain play type are more likely to be effificent the following season compared to a player with a lower PPP. In the case of isolations, we can expect a player's next year's PPP in this play type to increase by about 0.0315 for every additional 0.1 increase in his current season PPP, holding the other level-one predictors as well as the team he is on constant. The statistical significance of the other level one predictors vary across the three models, and I will examine these differences and what they might mean in relation to the research problem in the analysis and conclusions part of the paper. The random effects associated with a player's team suggest that there are team-specific influences on player performance that are not captured by the player-level predictors. Lastly, the residual standard deviation, which reflects the variability in the response variable not explained by the model, is large in each model within the context of the data. Looking again at the isolations play type output, 0.198 PPP is a huge difference in terms of the efficiency of a player (demonstrated by the distibutions of PPP in the EDA), and is an important finding to analyze as a takeaway from this study.
 
+Additionally, this is an example of what the random intercepts themselves look like (the $u_{0j}$). Here, I display the top five teams at developing spotup shooters by this metric along with their respective $u_{0j}$. The full tables will be in the appendix.
+
+```{r random-intercepts}
+random_effects <- ranef(model_iso)$TEAM_ABB
+
+# Convert to a data frame
+random_effects_df <- as.data.frame(random_effects)
+  
+# Reset the row names to create a column with the team abbreviations
+random_effects_df$TEAM_ABB <- rownames(random_effects_df)
+  
+# Rename the intercept column for clarity
+colnames(random_effects_df)[1] <- "Random_Intercept"
+  
+# Rearrange the columns for readability
+random_effects_df <- random_effects_df[, c("TEAM_ABB", "Random_Intercept")]
+  
+# Sort the dataframe by the random intercept values
+random_effects_df <- random_effects_df[order(random_effects_df$Random_Intercept, decreasing = TRUE), ]
+  
+# View the table
+row.names(random_effects_df) <- NULL
+
+  # Create the table with kable and kableExtra
+teams_table <- kable(head(random_effects_df), digits = 3, escape = FALSE, 
+                       caption = paste("<span style='font-size: 24px; color: black;'>Isolations</span>")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
+    column_spec(1, bold = T)
+
+teams_table
+```
+
+We can see that from 2015-2023, the Philadelphia 76ers were the best team at developing efficient isolation scorers by this method of evaluation. We can interpret this random intercept of around 0.015 as: for a given NBA player, we would expect them to improve their PPP on isolations in the following season by 0.015, on average, if they are a part of the 76ers compared to if they were not being developed by an NBA team. Although not seen here, there are negative random intercepts that appear across the three models, which can be interpreted as teams actually hindering their players' ability to develop offensively. I will delve into what teams stand out as either positive or negative in this regard in the next section.
+
+# Analysis and Conclusion
+
+In what was definitely a surprise to me, there was not too much overlap among the top teams when looking across the random intercepts from the three play types analyzed. I had hypothesized that some of the teams known for their great player development, such as the Miami Heat (Zillgitt), would appear near the top of each of these lists, however the Heat had an almost negligible impact in every case (possible reasons why discussed in Limitations). With that being said, the standout team for me was the Philadelphia 76ers. They had a random intercept of 0.015 (ranked 1st) in the isolations model and one of 0.006 (ranked 4th) in the pick and roll ball-handlers model, and were the only team to be top five in both (spotups had essentially no teams with a strong influence positively or negatively which is looked at in detail later in this section). This checks out, as over the time period the data is from the 76ers have emerged as a consistent threat to win the Eastern conference, and even produced the league's Most Valuable Player last year in Joel Embiid. On the flip side, two teams that popped on the negative side are the Pistons and Lakers. First looking at the Pistons, they placed last and second-to-last, respectively, in the isolations and pick and roll ball handlers models, which goes along perfectly with their status as the consensus worst franchise in the NBA. They have fluctuated between below-average and awful since 2015, and their lack of offensive player development has been clear through these times. The Lakers, on the other hand, have been mostly successful since LeBron James (one of the best basketball players of all time) joined the team in 2018, however they were really bad in the years prior to his arrival. I suspect their poor standing in developing isolation scorers and pick and roll ball handlers stems from both those three years before LeBron when the team lacked a clear direction as well as the lack of skill improvement that is expected by a team full of veterans. After signing with the Lakers, James made a strong push to the Lakers front office to surround him with experienced players he could trust in the playoffs, and with him and fellow star Anthony Davis (who developed primarily while on the New Orleans Pelicans before being traded to the Lakers) carrying the load there was not much room for these relatively older players to develop offensively. The Pistons and Lakers examples exhibit the importance of context in this analysis, as the most likely reasons for their respective random intercepts are in reality very different from one another.
+
+Moving on to the second part of my conclusions, analyzing the model outputs for the three different play types of isolations, spotups, and pick and rolls provides a multifaceted view of the factors contributing to a player's offensive efficiency in the NBA, and there are a few key points from this I want to analyze in addition to the above team-centric findings:
+
+The Points Per Possession (PPP) coefficient is particularly telling across all models as discussed in the results, though it is interesting to note that it is comparatively smaller in the isolation model, suggesting that current season efficiency might have a slightly less pronounced impact on the following season's performance in this play type. The variability in the significance and magnitude of other level-one predictors across the models invites further investigation. For example, the Frequency (FREQ) variable stands out in the Isolations model with a much larger coefficient compared to the Spot-ups and Pick and Rolls. This could suggest that gaining experience specifically in isolation plays has a more substantial impact on a player's subsequent performance in these scenarios. 
+
+Looking at team effects, the random intercept standard deviation in the spotups model is notably smaller than in the other models, implying that the team's ability to influence player development in spot-up shooting may be more limited. This could point to the idea that shooting proficiency may be a skill less amenable to improvement through team interventions, as opposed to ball-handling and decision-making skills, which seem to be more significantly influenced by the team environment. 
+
+I noticed that an unexpected dichotomy arises between the Free Throw Attempt Frequency (FTA_FREQ) and the Turnover Frequency (TOV_FREQ) coefficients across all models. Contrary to initial assumptions, FTA_FREQ consistently shows a negative relationship with the response variable, indicating that more frequent trips to the free-throw line in the current season do not necessarily predict better offensive efficiency in the subsequent season. Conversely, TOV_FREQ has a positive coefficient in all models, suggesting that players with higher turnover rates might be involved in more dynamic plays, which could contribute to better performance in the long run, though this warrants a deeper exploration to fully understand the underlying dynamics.
+
+The residual standard deviation, reflecting unexplained variability, is substantial across all models. Considering the distribution of PPP in the exploratory data analysis, this unexplained variability is a critical aspect of player performance that should be a focus of continued research. 
+
+This research has demonstrated that while PPP remains a consistent predictor of future performance across play types, the influence of other predictors and the team's role in player development vary, offering rich avenues for further analysis. The models suggest that while teams can influence certain aspects of a player's development, individual characteristics and the nature of the play type itself play pivotal roles in determining a player's offensive evolution. The findings underscore the complexity of player development in the NBA and highlight the need for tailored approaches to player training and development strategies.
+
+# Limitations
+
+The current study, while providing valuable insights into the factors influencing player performance across different play types in the NBA, is subject to several limitations that merit consideration. First off, the analysis does not account for player development that occurs outside the NBA, such as through the G-League, which can significantly contribute to a player's efficiency upon entering the NBA. Such developmental progress, reflective of a team's broader developmental capabilities, remains outside the purview of this study, as it focuses solely on data derived from NBA games. Moreover, there are additional player-specific variables that could be valuable in controlling for the analysis, such as age, years of experience, and tenure with the current team. While the exclusion of these variables was a deliberate choice to neutrally assess developmental stages, it is plausible that players may exhaust a team's developmental resources differently over time. For instance, a player's growth trajectory might be more pronounced in their formative years with a team compared to subsequent seasons. The influence of the coaching staff, which can significantly impact a team's ability to nurture offensive talent, is also not captured within this study. Given that coaching strategies and philosophies vary widely and coaches themselves may change frequently within a franchise, this represents a considerable factor that could sway the development of a player's offensive skill set. Lastly, the scope of the analysis is confined to three specific play types. While these play types are critical to understanding aspects of offensive efficiency, they do not provide an exhaustive view of the complex nature of developing a player's offensive capabilities. As such, the study offers a snapshot rather than a complete picture of the offensive development landscape within the NBA.
+Recognizing these limitations is essential for contextualizing the findings and for guiding future research, which could integrate a more holistic dataset that encompasses a wider range of developmental contexts and a broader spectrum of offensive play types.
+
+# Future Study
+
+There are several avenues which present themselves for expanding upon the current research and enriching our understanding of player development in the NBA. A future work could extend the analysis to encompass the remaining seven play types detailed within the dataset, employing a methodology akin to that used in this study. Such an expansion would enable a more comprehensive evaluation of player efficiency and development across the full spectrum of offensive strategies. Additionally, amalgamating play types that are conceptually similar — such as pick and roll ball handlers and players reeiving the ball of off a hand off — could yield more nuanced insights. Grouping these kinds of play types may clarify distinctions in teams' developmental impact, shedding light on whether certain teams excel in broader offensive domains rather than in isolated play types.
+
+Furthermore, integrating a mechanism to account for coaching changes would be a significant enhancement to the analysis. Coaching staff play a pivotal role in player development, and their influence can vary markedly from one coach to another. By tracking coaching tenures and correlating them with changes in player performance, a future study could offer a more dynamic and current appraisal of a team's capability to foster offensive talent. This would also allow for the disentanglement of the effects of team environment and coaching strategies on player development, contributing to a more sophisticated understanding of how teams can enhance their players' offensive prowess in the NBA.
+
+# Citations
+
+Scaletta, Kelly. "Why NBA Game Pace Is Historicically High". Lineups.com. https://www.lineups.com/articles/why-nba-game-pace-is-at-historic-high/
+
+Thinking Machines Data Science. "A whole new ball game: Quantifying changes in NBA basketball over the past 30 years". https://stories.thinkingmachin.es/nba-in-30-years/
+
+Wal, Goding (2020). "How the NBA has changed in the past 20 years, and insights to win". Medium.com. https://medium.com/@gwal325/how-the-nba-has-changed-in-the-past-20-years-and-insights-to-win-23f8e9f17643
+
+Zillgitt, Jeff (2023). "Heat's secret sauce to building a winning roster includes dash of undrafted players". USA Today. https://www.usatoday.com/story/sports/nba/heat/2023/06/03/heats-nba-finals-march-made-possible-by-developing-undrafted-players/70284775007/
+
+# Appendix
+
+Full model summaries:
+
+```{r model_summaries}
+summary(model_iso)
+summary(model_pnr)
+summary(model_spotup)
+```
+
+Random intercepts for each play type:
+
+```{r random-intercepts-iso}
+random_effects <- ranef(model_iso)$TEAM_ABB
+
+# Convert to a data frame
+random_effects_df <- as.data.frame(random_effects)
+  
+# Reset the row names to create a column with the team abbreviations
+random_effects_df$TEAM_ABB <- rownames(random_effects_df)
+  
+# Rename the intercept column for clarity
+colnames(random_effects_df)[1] <- "Random_Intercept"
+  
+# Rearrange the columns for readability
+random_effects_df <- random_effects_df[, c("TEAM_ABB", "Random_Intercept")]
+  
+# Sort the dataframe by the random intercept values
+random_effects_df <- random_effects_df[order(random_effects_df$Random_Intercept, decreasing = TRUE), ]
+  
+# View the table
+row.names(random_effects_df) <- NULL
+
+  # Create the table with kable and kableExtra
+teams_table <- kable(random_effects_df, digits = 3, escape = FALSE, 
+                       caption = paste("<span style='font-size: 24px; color: black;'>Isolations</span>")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
+    column_spec(1, bold = T)
+
+teams_table
+```
+
+```{r random-intercepts-pnr}
 random_effects <- ranef(model_pnr)$TEAM_ABB
 
 # Convert to a data frame
 random_effects_df <- as.data.frame(random_effects)
-
+  
 # Reset the row names to create a column with the team abbreviations
 random_effects_df$TEAM_ABB <- rownames(random_effects_df)
-
+  
 # Rename the intercept column for clarity
 colnames(random_effects_df)[1] <- "Random_Intercept"
-
+  
 # Rearrange the columns for readability
 random_effects_df <- random_effects_df[, c("TEAM_ABB", "Random_Intercept")]
-
+  
 # Sort the dataframe by the random intercept values
 random_effects_df <- random_effects_df[order(random_effects_df$Random_Intercept, decreasing = TRUE), ]
-
+  
 # View the table
 row.names(random_effects_df) <- NULL
-random_effects_df |>
-  kable(digits = 3)
+
+  # Create the table with kable and kableExtra
+teams_table <- kable(random_effects_df, digits = 3, escape = FALSE, 
+                       caption = paste("<span style='font-size: 24px; color: black;'>Pick and Roll Ball-Handler</span>")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
+    column_spec(1, bold = T)
+
+teams_table
 ```
 
+```{r random-intercepts-spotup}
+random_effects <- ranef(model_spotup)$TEAM_ABB
 
-# Citations
+# Convert to a data frame
+random_effects_df <- as.data.frame(random_effects)
+  
+# Reset the row names to create a column with the team abbreviations
+random_effects_df$TEAM_ABB <- rownames(random_effects_df)
+  
+# Rename the intercept column for clarity
+colnames(random_effects_df)[1] <- "Random_Intercept"
+  
+# Rearrange the columns for readability
+random_effects_df <- random_effects_df[, c("TEAM_ABB", "Random_Intercept")]
+  
+# Sort the dataframe by the random intercept values
+random_effects_df <- random_effects_df[order(random_effects_df$Random_Intercept, decreasing = TRUE), ]
+  
+# View the table
+row.names(random_effects_df) <- NULL
 
-Scaletta - https://www.lineups.com/articles/why-nba-game-pace-is-at-historic-high/
-Wal - https://medium.com/@gwal325/how-the-nba-has-changed-in-the-past-20-years-and-insights-to-win-23f8e9f17643
-Thinking Machines Data Science - https://stories.thinkingmachin.es/nba-in-30-years/
+  # Create the table with kable and kableExtra
+teams_table <- kable(random_effects_df, digits = 3, escape = FALSE, 
+                       caption = paste("<span style='font-size: 24px; color: black;'>Spotups</span>")) %>%
+    kable_styling(bootstrap_options = c("striped", "hover"), full_width = F) %>%
+    column_spec(1, bold = T)
+
+teams_table
+```
